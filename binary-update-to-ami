@@ -1,0 +1,61 @@
+#!/bin/bash
+#curl -s https://raw.githubusercontent.com/RantyDave/omnios-tools/master/binary-update-to-ami | sh
+#start with ami-ae5742cd
+
+echo ----------Updating OmniOS
+cd ~
+/usr/bin/wget -P /etc/ssl/pkg https://downloads.omniosce.org/ssl/omniosce-ca.cert.pem
+/usr/bin/pkg set-publisher -P -G https://pkg.omniti.com/omnios/r151022/ -g https://pkg.omniosce.org/r151022/core/ omnios
+/usr/bin/pkg update -rv web/ca-bundle
+rm /etc/ssl/pkg/omniosce-ca.cert.pem 
+pkg install pkg:/package/pkg
+/usr/bin/pkg update -rv
+
+echo ----------Regenerate ssh keys on next boot
+rm /etc/ssh/ssh_host*
+cat > /etc/init.d/regenerate_ssh << EOF
+ssh-keygen -f /etc/ssh/ssh_host_dsa_key -N '' -t dsa
+ssh-keygen -f /etc/ssh/ssh_host_rsa_key -N '' -t rsa
+ssh-keygen -f /etc/ssh/ssh_host_ecdsa_key -N '' -t ecdsa
+ssh-keygen -f /etc/ssh/ssh_host_ed25519_key -N '' -t ed25519
+rm /etc/init.d/regenerate_ssh
+EOF
+chown root:sys /etc/init.d/regenerate_ssh
+chmod 744 /etc/init.d/regenerate_ssh
+chmod +x /etc/init.d/regenerate_ssh
+
+echo ----------Cover our tracks
+rm -f /var/adm/messages.*
+rm -f /var/log/syslog.*
+cat /dev/null > /var/adm/messages
+cat /dev/null > /var/log/syslog
+cat /dev/null > /var/adm/wtmpx
+cat /dev/null > /var/adm/utmpxw
+svcadm disable -s fmd
+find /var/fm/fmd -type f -exec rm {} \;
+svcadm enable -s fmd
+fmadm reset eft
+fmadm reset io-retire
+rm -rf /root/.ssh
+rm -f /root/.bash_history
+rm -f /root/.viminfo
+
+echo ----------Simplify boot
+cat > loader.conf.local << EOF
+autoboot_delay="0"
+beastie_disable="YES"
+EOF
+
+echo ----------Make a service for mounting instance disks as swap
+curl -s https://raw.githubusercontent.com/RantyDave/omnios-tools/master/ec2-drives-as-swap > /lib/svc/method/ec2-drives-as-swap
+chown root:bin /lib/svc/method/ec2-drives-as-swap
+chmod +x /lib/svc/method/ec2-drives-as-swap
+
+curl -s https://raw.githubusercontent.com/RantyDave/omnios-tools/master/ec2-drives-as-swap.xml  > /lib/svc/manifest/system/ec2-drives-as-swap.xml
+chown root:sys /lib/svc/manifest/system/ec2-drives-as-swap.xml
+svccfg import /lib/svc/manifest/system/ec2-drives-as-swap.xml
+
+echo ----------Removing drivers has to be done last
+pkg uninstall --no-backup-be entire driver/network/platform driver/graphics/atiatom driver/graphics/drm driver/network/afe driver/network/amd8111s driver/network/atge driver/network/bfe driver/network/bge driver/network/bnx driver/network/bnxe driver/network/bpf driver/network/chxge driver/network/dmfe driver/network/emlxs driver/network/eoib driver/network/fcip driver/network/fcp driver/network/fcsm driver/network/fp driver/network/hermon driver/network/hme driver/network/hxge driver/network/ibdma driver/network/ibp driver/network/igb driver/network/iprb driver/network/mxfe driver/network/myri10ge driver/network/nge driver/network/ntxn driver/network/nxge driver/network/ofk driver/network/pcn driver/network/qlc driver/network/rds driver/network/rdsv3 driver/network/rge driver/network/rpcib driver/network/rtls driver/network/sdp driver/network/sdpib driver/network/sfe driver/network/sfxge driver/network/tavor driver/network/usbecm driver/network/vr driver/network/xge driver/network/yge driver/firewire driver/network/elxl driver/pcmcia driver/storage/aac driver/storage/adpu320 driver/storage/amr driver/storage/arcmsr driver/storage/bcm_sata driver/storage/cpqary3 driver/storage/glm driver/storage/lsimega driver/storage/marvell88sx driver/storage/mega_sas driver/storage/mpt_sas driver/storage/mr_sas driver/storage/pmcs driver/storage/sbp2 driver/storage/scsa1394 driver/storage/sdcard driver/storage/ses driver/storage/si3124 system/kvm driver/virtualization/kvm driver/serial/usbftdi driver/serial/usbsacm driver/serial/usbser_edge driver/serial/usbsksp  driver/serial/usbsksp/usbs49_fw driver/serial/usbsprl driver/network/e1000g driver/network/i40e driver/network/ixgb driver/network/ixgbe driver/network/vmxnet3s driver/storage/nvme driver/storage/nv_sata system/storage/fibre-channel/port-utility
+
+echo ----------Poweroff and make AMI
