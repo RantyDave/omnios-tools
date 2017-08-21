@@ -1,0 +1,13 @@
+#!/usr/bin/bash
+boot_disk=/dev/dsk/$(zpool list -v | egrep 'c1t2[0-9]*d0s0' | awk '{ print $1; }')
+all_disks=$(ls -l /dev/dsk/c1t*d0s0 | awk '{ print $9; }')
+for disk in $all_disks;
+do
+  if [ ! "$disk" == "$boot_disk" ]; then
+    device=$(readlink -s $disk)
+    ls $device 2> /dev/null
+    if [ $? == "0" ]; then
+        swap -a $disk
+    fi
+  fi 
+done
