@@ -5,7 +5,7 @@
         <create_default_instance enabled="true"/>
         <single_instance/>
         <dependency name="everything" grouping="require_all" restart_on="error" type="service">
-            <service_fmri value="svc:/milestone/single-user"/>
+            <service_fmri value="svc:/milestone/multi-user-server"/>
         </dependency>
         <method_context>
             <method_credential user="root" group="root"/>
