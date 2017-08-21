@@ -8,4 +8,4 @@ Broadly we:
 * Run 'pre-ami-clean'
 * Poweroff and make the AMI
 
-Note that ec2-drives-as-swap is under suspicion at the moment...
+Note that ec2-drives-as-swap needs you to explicitly attach the instance drives to the instance when you create it.
